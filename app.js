@@ -4,13 +4,20 @@ const path = require('path');
 const http = require('http');
 const socketio = require('socket.io');
 const Filter = require('bad-words');
-const { createMessage, createLocationMessage } = require('./utils/helpers');
+const { createMessage, createLocationMessage } = require('./utils/utils');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketio(server);
 
 const _BASE_MAP_URL = 'https://google.com/maps?q=';
+
+//!Cheatsheet
+//socket.emit => send to client
+//io.emit => send to all users
+//socket.broadcast.emit => send to all users except user that sent
+//io.to.emit => emit to all in specific room
+//socket.broadcast.to.emit => to all in room except me
 
 //Serve static css, js and images
 const public = path.join(__dirname, './public');
@@ -19,10 +26,15 @@ app.use(express.static(public));
 //Sockets server
 //!socket - obj contains info about connection
 io.on('connection', socket => {
-	socket.emit('onMessage', createMessage('Welcome to the Chat'));
+	socket.on('joinRoom', ({ username, room }) => {
+		socket.join(room);
 
-	//Broadcast except this current connection
-	socket.broadcast.emit('onMessage', createMessage('A new user joined chat'));
+		socket.emit('onMessage', createMessage('Welcome to the Chat'));
+
+		socket.broadcast
+			.to(room)
+			.emit('onMessage', createMessage(`${username} has joined chat`));
+	});
 
 	//!get message
 	socket.on('onMessageSend', (msg, cbAcknowledge) => {
@@ -32,19 +44,10 @@ io.on('connection', socket => {
 			return cbAcknowledge('Profanity is now allowed!');
 		}
 
-		// const timeStamp = `${new Date()
-		// 	.toLocaleDateString()
-		// 	.replace(
-		// 		/[\/]/g,
-		// 		'-'
-		// 	)} ${new Date().getHours()}:${new Date().getMinutes()}:${new Date()
-		// 	.getSeconds()
-		// 	.toPrecision(2)}`;
-
-		//!send message to everyone, because of io.
-		io.emit('onMessage', createMessage(msg));
+		//!send message to everyone
+		io.to('Cars').emit('onMessage', createMessage(msg));
 		//Callback to client if message was delivered for ex.
-		cbAcknowledge(`This if from server. Delivered ${timeStamp}`);
+		cbAcknowledge();
 	});
 
 	//catch data from event

@@ -1,3 +1,5 @@
+const h = new Helpers();
+const { renderHTML, parseURI } = h;
 //sockets client init
 const socket = io();
 
@@ -8,25 +10,14 @@ const geoBtn = document.querySelector('#btnLocation');
 const messagesWindow = document.querySelector('#messages');
 
 //CUSTOM RENDER
-const renderHTML = (value, options) => {
-	let attributes;
-	if (options.attr) {
-		attributes = options.attr.reduce((acc, cur) => {
-			const [kvp] = Object.entries(cur);
-			const [att, val] = kvp;
-			acc += `${att}="${val}" `;
-			return acc;
-		}, '');
-	}
 
-	let htmlElement = `<${options.tag} ${attributes} class="${options.class}">${value}</${options.tag}>`;
+//OPTIONS
+const { username, room } = parseURI(location.search);
 
-	return htmlElement;
-};
+//JOIN ROOM
+socket.emit('joinRoom', { username, room });
 
-//
 
-//catch event from server
 socket.on('onMessage', data => {
 	const { text, createdAt } = data;
 	messagesWindow.insertAdjacentHTML(
@@ -54,7 +45,7 @@ form.addEventListener('submit', e => {
 	msgBtn.setAttribute('disabled', true);
 
 	const msg = inputMSG.value;
-	//emit event
+
 	// 3rd arg is a callback allows to acknowledge this event by server
 	socket.emit('onMessageSend', msg, responseFromServer => {
 		//enable btn
