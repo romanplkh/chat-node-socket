@@ -8,39 +8,43 @@ const geoBtn = document.querySelector('#btnLocation');
 const messagesWindow = document.querySelector('#messages');
 
 //CUSTOM RENDER
-Object.defineProperty(Element.prototype, 'renderHTML', {
-	value: function renderHTML(value, options) {
-		let attributes;
-		if (options.attr) {
-			attributes = options.attr.reduce((acc, cur) => {
-				const [kvp] = Object.entries(cur);
-				const [att, val] = kvp;
-				acc += `${att}="${val}" `;
-				return acc;
-			}, '');
-		}
+const renderHTML = (value, options) => {
+	let attributes;
+	if (options.attr) {
+		attributes = options.attr.reduce((acc, cur) => {
+			const [kvp] = Object.entries(cur);
+			const [att, val] = kvp;
+			acc += `${att}="${val}" `;
+			return acc;
+		}, '');
+	}
 
-		let htmlElement = `<${options.tag} ${attributes} class="${options.class}">${value}</${options.tag}>`;
+	let htmlElement = `<${options.tag} ${attributes} class="${options.class}">${value}</${options.tag}>`;
 
-		this.insertAdjacentHTML('beforeend', htmlElement);
-	},
-	writable: true,
-	configurable: true
-});
+	return htmlElement;
+};
 
 //
 
 //catch event from server
-socket.on('onMessage', msg => {
-	messagesWindow.renderHTML(msg, { tag: 'p' });
+socket.on('onMessage', data => {
+	const { text, createdAt } = data;
+	messagesWindow.insertAdjacentHTML(
+		'beforeend',
+		renderHTML(createdAt + ' - ' + text, { tag: 'p' })
+	);
 });
 
 socket.on('onLocationMsg', msg => {
-	messagesWindow.renderHTML('My current location', {
-		tag: 'a',
-		class: 'link',
-		attr: [{ href: msg }, { target: '_blank' }]
-	});
+	messagesWindow.insertAdjacentHTML(
+		'beforeend',
+		`<span>${msg.createdAt}<span> -` +
+			renderHTML('My current location', {
+				tag: 'a',
+				class: 'link',
+				attr: [{ href: msg.url }, { target: '_blank' }]
+			})
+	);
 });
 
 form.addEventListener('submit', e => {
