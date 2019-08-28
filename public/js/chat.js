@@ -9,14 +9,41 @@ const msgBtn = form.querySelector("input[type='submit']");
 const geoBtn = document.querySelector('#btnLocation');
 const messagesWindow = document.querySelector('#messages');
 
-//CUSTOM RENDER
+//SCROLL
+
+const autoScroll = () => {
+	//GETT MESSAGE
+	const newMessage = messagesWindow.lastElementChild;
+
+	//Height of new message
+	const newMessageStyles = getComputedStyle(newMessage);
+	const newMessageMarginBottom = parseInt(newMessageStyles.marginBottom);
+	const newMessageHeight = newMessage.offsetHeight + newMessageMarginBottom;
+
+	//Visible height
+	const visibleHeight = messagesWindow.offsetHeight;
+
+	//Height of messages container
+	const containerHeight = messagesWindow.scrollHeight;
+
+	//How far have I scrolled?
+	const scrollOffset = messagesWindow.scrollTop + visibleHeight;
+
+	if (containerHeight - newMessageHeight <= scrollOffset) {
+		messagesWindow.scrollTop = messagesWindow.scrollHeight;
+	}
+};
 
 //OPTIONS
 const { username, room } = parseURI(location.search);
 
 //JOIN ROOM
-socket.emit('joinRoom', { username, room });
-
+socket.emit('joinRoom', { username, room }, serverResponse => {
+	if (serverResponse) {
+		alert(serverResponse);
+		location.href = '/';
+	}
+});
 
 socket.on('onMessage', data => {
 	const { text, createdAt } = data;
@@ -24,18 +51,27 @@ socket.on('onMessage', data => {
 		'beforeend',
 		renderHTML(createdAt + ' - ' + text, { tag: 'p' })
 	);
+	autoScroll();
 });
 
 socket.on('onLocationMsg', msg => {
 	messagesWindow.insertAdjacentHTML(
 		'beforeend',
-		`<span>${msg.createdAt}<span> -` +
+		`<span class="text-danger">${msg.username}</span> ` +
 			renderHTML('My current location', {
 				tag: 'a',
 				class: 'link',
 				attr: [{ href: msg.url }, { target: '_blank' }]
-			})
+			}) +
+			` <p >${msg.createdAt}<p>`
 	);
+	autoScroll();
+});
+
+//SIDEBAR
+socket.on('onChangeUserInRoom', ({ room, users }) => {
+	console.log(room);
+	console.log(users);
 });
 
 form.addEventListener('submit', e => {

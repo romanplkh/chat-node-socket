@@ -5,6 +5,12 @@ const http = require('http');
 const socketio = require('socket.io');
 const Filter = require('bad-words');
 const { createMessage, createLocationMessage } = require('./utils/utils');
+const {
+	getUser,
+	addUser,
+	removeUser,
+	getUsersInRoom
+} = require('./utils/users');
 
 const app = express();
 const server = http.createServer(app);
@@ -26,18 +32,35 @@ app.use(express.static(public));
 //Sockets server
 //!socket - obj contains info about connection
 io.on('connection', socket => {
-	socket.on('joinRoom', ({ username, room }) => {
-		socket.join(room);
+	socket.on('joinRoom', (credentials, cbAcknowledge) => {
+		const { error, user } = addUser({ id: socket.id, ...credentials });
 
-		socket.emit('onMessage', createMessage('Welcome to the Chat'));
+		if (error) {
+			return cbAcknowledge(error);
+		}
+
+		socket.join(user.room);
+		socket.emit('onMessage', createMessage('Admin', 'Welcome to the Chat'));
 
 		socket.broadcast
-			.to(room)
-			.emit('onMessage', createMessage(`${username} has joined chat`));
+			.to(user.room)
+			.emit(
+				'onMessage',
+				createMessage('Admin', `${user.username} has joined chat`)
+			);
+
+		//SEND ALL USERS IN ROOM
+		io.to(user.room).emit('onChangeUserInRoom', {
+			room: user.room,
+			users: getUsersInRoom(user.room)
+		});
+		cbAcknowledge();
 	});
 
 	//!get message
 	socket.on('onMessageSend', (msg, cbAcknowledge) => {
+		const user = getUser(socket.id);
+
 		const filter = new Filter();
 
 		if (filter.isProfane(msg)) {
@@ -45,23 +68,41 @@ io.on('connection', socket => {
 		}
 
 		//!send message to everyone
-		io.to('Cars').emit('onMessage', createMessage(msg));
+		io.to(user.room).emit('onMessage', createMessage(user.username, msg));
 		//Callback to client if message was delivered for ex.
 		cbAcknowledge();
 	});
 
 	//catch data from event
 	socket.on('onGeoCoords', ({ latitude, longitude }, cb) => {
-		io.emit(
+		const user = getUser(socket.id);
+		io.to(user.room).emit(
 			'onLocationMsg',
-			createLocationMessage(`${_BASE_MAP_URL}${latitude},${longitude} `)
+			createLocationMessage(
+				user.username,
+				`${_BASE_MAP_URL}${latitude},${longitude} `
+			)
 		);
 		cb('Geoposition shared');
 	});
 
 	//built-in event
 	socket.on('disconnect', () => {
-		socket.broadcast.emit('onMessage', createMessage('User has left the chat'));
+		const user = removeUser(socket.id);
+
+		if (user) {
+			socket
+				.to(user.room)
+				.emit(
+					'onMessage',
+					createMessage('Admin', `${user.username} has left the chat`)
+				);
+
+			io.to(user.room).emit('onChangeUserInRoom', {
+				room: user.room,
+				users: getUsersInRoom(user.room)
+			});
+		}
 	});
 });
 
